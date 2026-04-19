@@ -1,13 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import TestimonialForm from './features/testimonials/TestimonialForm'
-import TestimonialsList from './features/testimonials/TestimonialsList'
 import { getDb } from './lib/firebase'
-import { createTestimonial, subscribeTestimonials } from './features/testimonials/testimonialsApi'
+import { createTestimonial } from './features/testimonials/testimonialsApi'
 
 function App() {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [status, setStatus] = useState({ type: 'idle', message: '' })
 
   let db
   let firebaseError = ''
@@ -20,27 +17,10 @@ function App() {
         : 'Missing Firebase environment variables. Check your GitHub Secrets / .env.'
   }
 
-  useEffect(() => {
-    if (firebaseError) return
-
-    const unsubscribe = subscribeTestimonials(db, {
-      limitCount: 30,
-      onChange: (next) => {
-        setItems(next)
-        setLoading(false)
-      },
-      onError: (e) => {
-        setError(e instanceof Error ? e.message : 'Failed to load testimonials.')
-        setLoading(false)
-      },
-    })
-
-    return () => unsubscribe()
-  }, [db, firebaseError])
-
   async function handleCreate(payload) {
     if (firebaseError) throw new Error(firebaseError)
     await createTestimonial(db, payload)
+    setStatus({ type: 'success', message: 'Posted. Thanks for your feedback.' })
   }
 
   return (
@@ -67,7 +47,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-2">
+      <main className="mx-auto max-w-2xl px-4 py-8">
         <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-900">Post a testimonial</h2>
@@ -83,23 +63,12 @@ function App() {
           ) : (
             <TestimonialForm onSubmit={handleCreate} />
           )}
-        </section>
 
-        <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900">Latest</h2>
-              <p className="mt-1 text-sm text-zinc-600">
-                Stored in Firestore collection <code className="font-mono">testimonials</code>.
-              </p>
+          {status.type === 'success' ? (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {status.message}
             </div>
-            <div className="text-sm text-zinc-500">{items.length} total</div>
-          </div>
-          <TestimonialsList
-            items={items}
-            loading={firebaseError ? false : loading}
-            error={firebaseError || error}
-          />
+          ) : null}
         </section>
       </main>
 
