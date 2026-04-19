@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import TestimonialForm from './features/testimonials/TestimonialForm'
 import TestimonialsList from './features/testimonials/TestimonialsList'
-import { db } from './lib/firebase'
+import { getDb } from './lib/firebase'
 import { createTestimonial, subscribeTestimonials } from './features/testimonials/testimonialsApi'
 
 function App() {
@@ -9,7 +9,20 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  let db
+  let firebaseError = ''
+  try {
+    db = getDb()
+  } catch (e) {
+    firebaseError =
+      e instanceof Error
+        ? e.message
+        : 'Missing Firebase environment variables. Check your GitHub Secrets / .env.'
+  }
+
   useEffect(() => {
+    if (firebaseError) return
+
     const unsubscribe = subscribeTestimonials(db, {
       limitCount: 30,
       onChange: (next) => {
@@ -23,9 +36,10 @@ function App() {
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [db, firebaseError])
 
   async function handleCreate(payload) {
+    if (firebaseError) throw new Error(firebaseError)
     await createTestimonial(db, payload)
   }
 
@@ -57,9 +71,18 @@ function App() {
         <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-900">Post a testimonial</h2>
-            <p className="mt-1 text-sm text-zinc-600">Message is required. Name is optional.</p>
+            <p className="mt-1 text-sm text-zinc-600">Message is required. Nickname is required.</p>
           </div>
-          <TestimonialForm onSubmit={handleCreate} />
+          {firebaseError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              <div className="font-semibold">Firebase config missing</div>
+              <div className="mt-1">
+                Set your GitHub repository Secrets (or local `.env`) and redeploy. See `README.md`.
+              </div>
+            </div>
+          ) : (
+            <TestimonialForm onSubmit={handleCreate} />
+          )}
         </section>
 
         <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -72,7 +95,11 @@ function App() {
             </div>
             <div className="text-sm text-zinc-500">{items.length} total</div>
           </div>
-          <TestimonialsList items={items} loading={loading} error={error} />
+          <TestimonialsList
+            items={items}
+            loading={firebaseError ? false : loading}
+            error={firebaseError || error}
+          />
         </section>
       </main>
 
